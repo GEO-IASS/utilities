@@ -1,0 +1,430 @@
+from __future__ import print_function, division
+from glob import glob
+from random import random
+import os
+from numpy import array
+from geojson import load
+from shapely.geometry import Polygon
+from shapely import wkt
+import pandas as pd
+import time
+import cPickle as pickle
+import math
+import numpy as np
+from multiprocessing import Pool, Process
+import multiprocessing
+import csv
+import itertools
+import sys
+def polygonize(csv_path):
+    polys = []
+    polys_df = pd.read_csv(csv_path)
+    image_ids = set(polys_df['ImageId'].tolist())
+    for image_id in image_ids:
+        img_df = polys_df.loc[polys_df['ImageId'] == image_id]
+        building_ids = set(img_df['BuildingId'].tolist())
+        for building_id in building_ids:
+            if building_id != 0:
+                building_df = img_df.loc[img_df['BuildingId'] == building_id]
+                poly = zip(building_df['X'].astype(int), building_df['Y'].astype(int))
+                polys.append({'ImageId': image_id, 'BuildingId': building_id, 'poly': Polygon(poly)})
+    return polys
+
+def get_image_ids(csv_path):
+    polys_df = pd.read_csv(csv_path)
+    return set(polys_df['ImageId'].tolist())
+
+def load_sorted_polygons(test_csv_path, truth_csv_path):
+    # Assumes -
+    # 1. Polygons are presorted for descending confindence.
+    # 2. Chips with no buildings assign zero for the BuildingId
+    return importFromGeoJson(test_csv_path), polygonize(truth_csv_path)
+
+def IoU2(test_poly, truth_polys):
+    iouList = []
+    for idx, truth_poly in enumerate(truth_polys):
+        #truth_poly=truth_poly.buffer(0.0)
+        #test_poly = test_poly.buffer(0.0)
+        #print(idx)
+        #if idx == 74:
+        #    pass
+        intersectionResult = test_poly.intersection(truth_poly)
+        if intersectionResult.geom_type == 'Polygon' or intersectionResult.geom_type == 'MultiPolygon':
+            intersectionArea = intersectionResult.area
+        else:
+            intersectionArea = 0
+        #print(intersectionArea)
+        unionArea = test_poly.union(truth_poly).area
+        #print(unionArea)
+
+        iouList.append(intersectionArea/unionArea)
+
+
+    return iouList
+
+
+def score(test_polys, truth_polys):
+
+    # Define internal functions
+
+    IoU = lambda p1, p2: (p1.intersection(p2).area/p1.union(p2).area)
+    argmax = lambda iterable, func: max(iterable, key=func)
+
+    # Find detections using threshold/argmax/IoU for test polygons
+    true_pos_count = 0
+    false_pos_count = 0
+    B = len(truth_polys)
+    M = len(test_polys)
+    idx = 0
+    for test_poly in test_polys:
+        if truth_polys:
+            #print(idx)
+            idx = idx +1
+            #if idx == 25:
+            #    pass
+            IoUs = IoU2(test_poly, truth_polys)
+            #IoUs = map(lambda x:IoU(test_poly,x),truth_polys)
+            if not IoUs:
+                maxIoU = 0
+            else:
+                maxIoU = max(IoUs)
+
+            threshold = 0.5
+            if maxIoU >= threshold:
+                true_pos_count += 1
+                del truth_polys[np.argmax(IoUs)]
+            else:
+                false_pos_count += 1
+        else:
+            false_pos_count = false_pos_count + 1
+    false_neg_count = B - true_pos_count
+    precision = true_pos_count/(true_pos_count+false_pos_count)
+    recall = true_pos_count/(true_pos_count+false_neg_count)
+    return true_pos_count, false_pos_count, false_neg_count
+
+
+def addbuffer(polys):
+    polysNewList = []
+    for poly in polys:
+        polyNew=poly
+        polyNew['poly'] = poly['poly'].buffer(0.0)
+        polysNewList.append(polyNew)
+
+    return polysNewList
+
+
+from osgeo import ogr
+def writeToGeoJson(polysList, geoJsonName, zeroImageIds=[]):
+        driver = ogr.GetDriverByName('geojson')
+        if os.path.exists(geoJsonName):
+            driver.DeleteDataSource(geoJsonName)
+        dataSource = driver.CreateDataSource(geoJsonName)
+        layer = dataSource.CreateLayer('buildings', geom_type=ogr.wkbPolygon)
+        layer.CreateField(ogr.FieldDefn("ImageId", ogr.OFTInteger))
+        layer.CreateField(ogr.FieldDefn("ContainsBuildings", ogr.OFTInteger))
+        layer.CreateField(ogr.FieldDefn("BuildingId", ogr.OFTInteger))
+        emptyCount = 0
+
+        for poly in polysList:
+            feature = ogr.Feature(layer.GetLayerDefn())
+            feature.SetField("ImageId", poly['ImageId'])
+            feature.SetField("BuildingId", poly['BuildingId'])
+
+            if poly['poly'].is_empty:
+                emptyCount = emptyCount + 1
+                print(emptyCount)
+                feature.SetField("ContainsBuildings", -1)
+            else:
+                feature.SetField("ContainsBuildings", 1)
+            polygonImport = ogr.CreateGeometryFromWkt(poly['poly'].wkt)
+            feature.SetGeometry(polygonImport)
+            # Create the feature in the layer (shapefile)
+            layer.CreateFeature(feature)
+            # Destroy the feature to free resources
+            feature.Destroy()
+
+        for zeroImageId in zeroImageIds:
+            feature = ogr.Feature(layer.GetLayerDefn())
+            feature.SetField("ImageId", zeroImageId)
+            feature.SetField("BuildingId", -1)
+            feature.SetField("ContainsBuildings", 0)
+            polygonImport = ogr.CreateGeometryFromWkt("POLYGON ((0 0, 0 0, 0 0, 0 0))")
+            feature.SetGeometry(polygonImport)
+            # Create the feature in the layer (shapefile)
+            layer.CreateFeature(feature)
+            # Destroy the feature to free resources
+            feature.Destroy()
+
+
+        dataSource.Destroy()
+
+def readWKTCSV(csv_path):
+
+    polys = []
+    polys_df = pd.read_csv(csv_path)
+    image_ids = set(polys_df['ImageId'].tolist())
+    for image_id in image_ids:
+        img_df = polys_df.loc[polys_df['ImageId'] == image_id]
+        building_ids = set(img_df['BuildingId'].tolist())
+        for building_id in building_ids:
+            if building_id != 0:
+                building_df = img_df.loc[img_df['BuildingId'] == building_id]
+                poly = wkt.loads(building_df.iloc[0,2])
+                polys.append({'ImageId': image_id, 'BuildingId': building_id, 'poly': poly})
+    return polys
+
+
+
+
+def writeToCSV_Polygon(polysList, csvFileName, zeroImageIds=[]):
+    with open(csvFileName, 'wb') as csvFileName:
+        fileWriter = csv.writer(csvFileName, delimiter=',')
+        fileWriter.writerow(['ImageId', 'BuildingId', 'PolygonWKT'])
+        idx = 0
+        for poly in polysList:
+            print(idx)
+            idx = idx + 1
+            #if poly['poly'].is_empty:
+            fileWriter.writerow([poly['ImageId'], poly['BuildingId'], poly['poly'].wkt])
+            #else:
+            #    if poly['poly'].geom_type == 'MultiPolygon':
+            #        for polyPart in poly['poly']:
+            #            xList,yList = polyPart.exterior.coords.xy
+
+            #            for x,y in zip(xList,yList):
+            #                fileWriter.writerow([poly['ImageId'], poly['BuildingId'], '{}'.format(int(x)), '{}'.format(int(y))])
+            #    else:
+            #        xList, yList = poly['poly'].exterior.coords.xy
+            #        for x, y in zip(xList, yList):
+            #            fileWriter.writerow([poly['ImageId'], poly['BuildingId'], '{}'.format(int(x)), '{}'.format(int(y))])
+
+        for zeroImageId in zeroImageIds:
+            print(idx)
+            idx = idx +1
+            fileWriter.writerow([zeroImageId, -1, Polygon([(0,0), (0,0), (0,0)]).wkt])
+
+
+
+
+def doublePolysList(polysList):
+    newPolysList = []
+    buildingId = 0
+    for poly in polysList:
+        buildingId = buildingId+1
+        poly['buildingId']=buildingId
+        newPolysList.append(poly)
+        buildingId = buildingId+1
+        poly['buildingId']=buildingId
+        newPolysList.append(poly)
+
+    return newPolysList
+
+
+def importFromGeoJson(geoJsonName):
+
+    #driver = ogr.GetDriverByName('geojson')
+    dataSource = ogr.Open(geoJsonName, 0)
+
+    layer = dataSource.GetLayer()
+    print(layer.GetFeatureCount())
+
+    polys =  []
+    image_id = 1
+    building_id = 0
+    for feature in layer:
+        building_id = building_id + 1
+        polys.append({'ImageId': feature.GetField('ImageId'), 'BuildingId': feature.GetField('BuildingId'), 'poly': wkt.loads(feature.GetGeometryRef().ExportToWkt())})
+
+    return polys
+
+import math
+import numpy as np
+def evalFunction2((image_id, (prop_polysIdList, prop_polysPoly), (sol_polysIdsList, sol_polysPoly))):
+
+    #test_polys = []
+    #truth_polys = []
+    #true_pos_count = 0
+    #false_pos_count = 0
+    #false_neg_count = 0
+    #image_test_polys = [item for item in prop_polys if item["ImageId"] == image_id]
+    #for poly in image_test_polys:
+    #    test_polys.append(poly['poly'])
+    test_polys = prop_polysPoly[np.argwhere(prop_polysIdList == image_id).flatten()]
+    truth_polys = sol_polysPoly[np.argwhere(sol_polysIdsList == image_id).flatten()]
+
+
+    #image_truth_polys = [item for item in sol_polys if item["ImageId"] == image_id]
+    if truth_polys == []:
+        true_pos_count = 0
+        false_pos_count = len(truth_polys)
+        false_neg_count = 0
+    else:
+        true_pos_count, false_pos_count, false_neg_count = score(test_polys, truth_polys.tolist())
+
+
+    if (true_pos_count > 0) or ((false_neg_count > 0) and (false_pos_count > 0)):
+
+        precision = float(true_pos_count) / (float(true_pos_count) + float(false_pos_count))
+        recall = float(true_pos_count) / (float(true_pos_count) + float(false_neg_count))
+        F1score = 2.0 * precision * recall / (precision + recall)
+    else:
+        F1score = 0
+    return (F1score, true_pos_count, false_pos_count, false_neg_count)
+        # print('F1 Score: ', F1score)
+        # print('bad count: ', bad_count)
+
+
+
+def evalFunction((image_id, prop_polys, sol_polys)):
+
+    test_polys = []
+    truth_polys = []
+    true_pos_count = 0
+    false_pos_count = 0
+    false_neg_count = 0
+    image_test_polys = [item for item in prop_polys if item["ImageId"] == image_id]
+    for poly in image_test_polys:
+        test_polys.append(poly['poly'])
+
+    image_truth_polys = [item for item in sol_polys if item["ImageId"] == image_id]
+    if image_truth_polys == []:
+        true_pos_count = 0
+        false_pos_count = len(image_test_polys)
+        false_neg_count = 0
+    else:
+        for poly in image_truth_polys:
+            truth_polys.append(poly['poly'])
+
+        true_pos_count, false_pos_count, false_neg_count = score(test_polys, truth_polys)
+
+
+    if (true_pos_count > 0) or ((false_neg_count > 0) and (false_pos_count > 0)):
+
+        precision = float(true_pos_count) / (float(true_pos_count) + float(false_pos_count))
+        recall = float(true_pos_count) / (float(true_pos_count) + float(false_neg_count))
+        F1score = 2.0 * precision * recall / (precision + recall)
+    else:
+        F1score = 0
+    return (F1score, true_pos_count, false_pos_count, false_neg_count)
+        # print('F1 Score: ', F1score)
+        # print('bad count: ', bad_count)
+
+def splitPoly2(polyList):
+    polyListNew = []
+    buildingId = 0
+    multiCount = 0
+
+    for poly in polyList:
+        polyTransfer = poly
+        if polyTransfer['poly'].geom_type == "Polygon":
+            buildingId = buildingId + 1
+            polyTransfer['BuildingId'] = buildingId
+            polyListNew.append({'ImageId': poly['ImageId'], 'BuildingId': buildingId, 'poly': wkt.loads(poly['poly'].wkt)})
+        elif polyTransfer['poly'].geom_type == "MultiPolygon":
+            multiCount = multiCount + 1
+            print('Multi Count {}'.format(multiCount))
+            print("multi")
+
+            print(poly['poly'].wkt)
+            for mpoly in poly['poly']:
+                polyTransfer1 = poly
+                buildingId = buildingId + 1
+                print("multipoly {}".format(buildingId))
+                print(mpoly.wkt)
+                polyTransfer1['BuildingId'] = buildingId
+                polyTransfer1['poly']       = wkt.loads(mpoly.wkt)
+
+                polyListNew.append({'ImageId': poly['ImageId'], 'BuildingId': buildingId, 'poly': wkt.loads(mpoly.wkt)})
+
+    return polyListNew
+
+
+
+if __name__ == "__main__":
+
+    if len(sys.argv)>1:
+        truth_fp = sys.argv[1]
+        test_fp = sys.argv[2]
+    else:
+        test_fp = '../solution_v4Buffer.geojson'
+        truth_fp = '../solution_v4Buffer.geojson'
+    if len(sys.argv)>3:
+        maxCPU = int(sys.argv[3])
+    else:
+        maxCPU = multiprocessing.cpu_count()
+
+    true_pos_counts = []
+    false_pos_counts = []
+    false_neg_counts = []
+
+
+
+
+    t0 = time.time()
+    # Start Ingest Of Truth and Test Case
+    sol_polys = importFromGeoJson(truth_fp)
+    # prop_polys = importFromGeoJson(test_fp)
+    #
+    #
+    # t1 = time.time()
+    # total = t1-t0
+    # print('time of ingest: ', total)
+    #
+    # # Speed up search by preprocessing ImageId and polygonIds
+    #
+    # test_image_ids = set([item['ImageId'] for item in prop_polys if item['ImageId']>0])
+    # prop_polysIdList = np.asarray([item['ImageId'] for item in prop_polys if item["ImageId"] >0])
+    # prop_polysPoly   = np.asarray([item['poly'] for item in prop_polys if item["ImageId"] >0])
+    # sol_polysIdsList = np.asarray([item['ImageId'] for item in sol_polys if item["ImageId"] >0])
+    # sol_polysPoly    = np.asarray([item['poly'] for item in sol_polys if item["ImageId"] >0])
+    #
+    # bad_count = 0
+    # F1ScoreList=[]
+    # cpuCount = min(multiprocessing.cpu_count(), maxCPU)
+    # print('{}'.format(cpuCount))
+    # p = Pool(processes=cpuCount)
+    # ResultList=[]
+    #
+    # # Calculate Values
+    # ResultList = p.map(evalFunction2, zip(test_image_ids, itertools.repeat((prop_polysIdList, prop_polysPoly), times=len(test_image_ids)),
+    #                                      itertools.repeat((sol_polysIdsList, sol_polysPoly), times=len(test_image_ids))))
+    # ResultSum = np.sum(ResultList, axis=0)
+    # True_Pos_Total = ResultSum[1]
+    # False_Pos_Total = ResultSum[2]
+    # False_Neg_Total = ResultSum[3]
+    # print('True_Pos_Total', True_Pos_Total)
+    # print('False_Pos_Total', False_Pos_Total)
+    # print('False_Neg_Total', False_Neg_Total)
+    # precision = float(True_Pos_Total) / (float(True_Pos_Total) + (False_Pos_Total))
+    # recall = float(True_Pos_Total) / (float(True_Pos_Total)+ (False_Neg_Total))
+    # F1ScoreTotal = 2.0*precision*recall/(precision+recall)
+    # print('F1Total', F1ScoreTotal)
+    #
+    #
+    # t2 = time.time()
+    # total = t2-t0
+    # print('time of evaluation: {}'.format(t2-t1))
+    # print('time of evaluation {}s/imageId'.format((t2-t1)/len(ResultList)))
+    # print('Total Time {}s'.format(total))
+    # print(ResultList)
+    # print(np.mean(ResultList))
+    #
+
+
+
+
+####################Notfor production
+
+originalCSV = '../data/Solution.csv'
+polys_df = pd.read_csv(originalCSV)
+noBuildings = polys_df[polys_df['ContainsBuildings']==0]
+csvFileName = '../data/SolutionV8.csv'
+#writeToCSV_Polygon(sol_polys, csvFileName, zeroImageIds=set(noBuildings['ImageId'].tolist()))
+
+sol_polysNoMultiV1 = splitPoly2(sol_polys)
+
+
+csvFileName = '../data/SolutionV8_noMulti.csv'
+geoJsonFileName = '../data/SolutionV8_noMulti.geojson'
+#writeToCSV_Polygon(sol_polysNoMultiV1, csvFileName, zeroImageIds=set(noBuildings['ImageId'].tolist()))
+writeToGeoJson(sol_polysNoMultiV1, geoJsonFileName, zeroImageIds=set(noBuildings['ImageId'].tolist()))
