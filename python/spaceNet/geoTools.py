@@ -493,7 +493,7 @@ def clipShapeFile(shapeSrc, outputFileName, polyToCut, minpartialPerc=0.0, debug
 
 
 def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory='', outputPrefix='clip_',
-                      clipSizeMX=100, clipSizeMY=100, clipOverlap=0.0, minpartialPerc=0.0):
+                      clipSizeMX=100, clipSizeMY=100, clipOverlap=0.0, minpartialPerc=0.0, createPix=False):
 
     srcImage = gdal.Open(rasterFile)
     geoTrans, poly, ulX, ulY, lrX, lrY = getRasterExtent(srcImage)
@@ -540,10 +540,16 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
                 ## Clip Image
                 subprocess.call(["gdalwarp", "-te", "{}".format(minXCut), "{}".format(minYCut),
                                  "{}".format(maxXCut),  "{}".format(maxYCut), rasterFile, outputFileName])
-                outGeoJSon = outputFileName.replace('.tif', '.geojson')
+                outGeoJson = outputFileName.replace('.tif', '.geojson')
                 ### Clip poly to cust to Raster Extent
                 polyVectorCut=polyCutWGS.Intersection(poly)
-                clipShapeFile(shapeSrc, outputFileName, polyVectorCut, minpartialPerc=minpartialPerc )
+                clipShapeFile(shapeSrc, outputFileName, polyVectorCut, minpartialPerc=minpartialPerc)
+
+                if createPix:
+                    #print('outGeoJson_{}'.format(outGeoJson))
+                    #print('outputFileName_{}'.format(outputFileName))
+                    convert_wgs84geojson_to_pixgeojson(outGeoJson, outputFileName, pixelgeojson=outGeoJson.replace('.geojson', '_PIX.geojson'))
+
 
 
 

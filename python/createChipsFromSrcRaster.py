@@ -20,6 +20,9 @@ if __name__ == '__main__':
                              "to be inlcluded, 0.0 = Include all of object in image no matter how small it is in "
                              "size to the entire of the object"
                              "Default is 0.0, Include everything", type=float)
+    parser.add_argument("-cpix", "--createPixelGeoJson",
+                        help="Create geoJson with polygon Coordinates in pixels",
+                        action="store_true")
 
     parser.add_argument("-m", "--maskFile", help="mask input raster with outline src",
                         action="store_true")
@@ -56,6 +59,15 @@ if __name__ == '__main__':
     else:
         minpartialPerc=0.0
 
+    if args.createPixelGeoJson:
+        createPix=True
+        print("createPix")
+    else:
+        createPix=False
+        print("createPixFalse")
+
+
+
     for rasterFile in rastList:
         rasterFinal = rasterFile
         if args.maskFile:
@@ -66,6 +78,7 @@ if __name__ == '__main__':
                              outputPrefix=output_prefix,
                              clipSizeMX=clipSize, clipSizeMY=clipSize,
                              clipOverlap=clipOverlap,
-                             minpartialPerc=minpartialPerc)
+                             minpartialPerc=minpartialPerc,
+                             createPix=createPix)
 
 

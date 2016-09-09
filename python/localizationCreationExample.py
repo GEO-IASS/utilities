@@ -7,40 +7,8 @@ import time
 import os
 import pickle
 from osgeo import ogr
+from spaceNet import labelTools as lT
 
-def createTruthPixelPickle(truthLineFile, pickleLocation=''):
-    if pickleLocation=='':
-        extension = os.path.splitext(truthLineFile)[1]
-        pickleLocation = truthLineFile.replace(extension, 'Pixline.p')
-    if truthLineFile != '':
-        # get Source Line File Information
-        shapef = ogr.Open(truthLineFile, 0)
-        truthLayer = shapef.GetLayer()
-        pt1X = []
-        pt1Y = []
-        pt2X = []
-        pt2Y = []
-        for tmpFeature in truthLayer:
-            tmpGeom = tmpFeature.GetGeometryRef()
-            for i in range(0, tmpGeom.GetPointCount()):
-                pt = tmpGeom.GetPoint(i)
-
-                if i == 0:
-                    pt1X.append(pt[0])
-                    pt1Y.append(pt[1])
-                elif i == 1:
-                    pt2X.append(pt[0])
-                    pt2Y.append(pt[1])
-
-        lineData = {'pt1X': np.asarray(pt1X),
-                    'pt1Y': np.asarray(pt1Y),
-                    'pt2X': np.asarray(pt2X),
-                    'pt2Y': np.asarray(pt2Y)
-                    }
-
-        with open(pickleLocation, 'wb') as f:
-            pickle.dump(lineData, f)
-            # get Source Line File Information
 
 if __name__ == "__main__":
 
@@ -66,7 +34,7 @@ if __name__ == "__main__":
         gT.convert_wgs84geojson_to_pixgeojson(wgs84geojson, inputraster, image_id=os.path.basename(inputraster.replace(".tif",'')), pixelgeojson=pixelgeojson,
                                            only_polygons=False)
 
-        createTruthPixelPickle(pixelgeojson, pickleLocation='')
+        lT.createTruthPixelPickle(pixelgeojson, pickleLocation='')
 
 
 

@@ -7,6 +7,11 @@ import subprocess
 import geoTools as gT
 import evalTools as eT
 import math
+import cPickle as pickle
+
+
+
+
 
 def evaluateLineStringPlane(geom, label='plane'):
     ring = ogr.Geometry(ogr.wkbLinearRing)
@@ -78,6 +83,68 @@ def convertLabelStringToPoly(shapeFileSrc, outGeoJSon, labelType='Airplane'):
             outLayer.CreateFeature(outFeature)
 
 
+def createTruthPixelPickle(truthLineFile, pickleLocation=''):
+    if pickleLocation=='':
+        extension = os.path.splitext(truthLineFile)[1]
+        pickleLocation = truthLineFile.replace(extension, 'Pixline.p')
+    if truthLineFile != '':
+        # get Source Line File Information
+        shapef = ogr.Open(truthLineFile, 0)
+        truthLayer = shapef.GetLayer()
+        pt1X = []
+        pt1Y = []
+        pt2X = []
+        pt2Y = []
+        for tmpFeature in truthLayer:
+            tmpGeom = tmpFeature.GetGeometryRef()
+            for i in range(0, tmpGeom.GetPointCount()):
+                pt = tmpGeom.GetPoint(i)
+
+                if i == 0:
+                    pt1X.append(pt[0])
+                    pt1Y.append(pt[1])
+                elif i == 1:
+                    pt2X.append(pt[0])
+                    pt2Y.append(pt[1])
+
+        lineData = {'pt1X': np.asarray(pt1X),
+                    'pt1Y': np.asarray(pt1Y),
+                    'pt2X': np.asarray(pt2X),
+                    'pt2Y': np.asarray(pt2Y)
+                    }
+
+        with open(pickleLocation, 'wb') as f:
+            pickle.dump(lineData, f)
+            # get Source Line File Information
+def createTruthPixelPickle(truthPoly, pickleLocation=''):
+    # returns dictionary with list of minX, maxX, minY, maxY
+
+    if pickleLocation=='':
+        extension = os.path.splitext(truthPoly)[1]
+        pickleLocation = truthPoly.replace(extension, 'Pixline.p')
+    if truthPoly != '':
+        # get Source Line File Information
+        shapef = ogr.Open(truthPoly, 0)
+        truthLayer = shapef.GetLayer()
+        envList = []
+
+        for tmpFeature in truthLayer:
+            tmpGeom = tmpFeature.GetGeometryRef()
+            env = tmpGeom.GetEvnelope()
+            envList.append(env)
+
+        envArray = np.asarray(envList)
+        envelopeData = {'minX': envArray[:,0],
+                        'maxX': envArray[:,1],
+                        'minY': envArray[:,2],
+                        'maxY': envArray[:,2]
+                        }
+
+
+        with open(pickleLocation, 'wb') as f:
+            pickle.dump(envelopeData, f)
+            # get Source Line File Information
+
 if __name__ == '__main__':
 
 
@@ -86,5 +153,8 @@ if __name__ == '__main__':
     srcRasterFile = '/Users/dlindenbaum/dataStorage/dgData/Airports/sample_polygon_labels/054841475060_01_assembly_2_3_LondonHeathrow.tif'
 
     convertLabelStringToPoly(srcVectorFile, dstVectorFile, labelType='Airplane')
+
+
+
 
 
