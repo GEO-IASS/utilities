@@ -4,7 +4,7 @@ import os
 import csv
 import rtree
 import subprocess
-
+import math
 
 
 def importgeojson(geojsonfilename):
@@ -133,6 +133,87 @@ def latlon2pixel(lat, lon, input_raster='', targetsr='', geom_transform=''):
     y_pix = (geom.GetPoint()[1] - y_origin) / pixel_height
 
     return (x_pix, y_pix)
+
+
+def returnBoundBox(xOff, yOff, pixDim, inputRaster, targetSR='', pixelSpace=False):
+    # Returns Polygon for a specific for a square defined by a center Pixel and
+    # number of pixels in each dimension.
+    # Leave targetSR as empty string '' or specify it as a osr.SpatialReference()
+    # targetSR = osr.SpatialReference()
+    # targetSR.ImportFromEPSG(4326)
+    if targetSR == '':
+        targetSR = osr.SpatialReference()
+        targetSR.ImportFromEPSG(4326)
+    xCord = [xOff - pixDim / 2, xOff - pixDim / 2, xOff + pixDim / 2,
+             xOff + pixDim / 2, xOff - pixDim / 2]
+    yCord = [yOff - pixDim / 2, yOff + pixDim / 2, yOff + pixDim / 2,
+             yOff - pixDim / 2, yOff - pixDim / 2]
+
+    ring = ogr.Geometry(ogr.wkbLinearRing)
+    for idx in xrange(len(xCord)):
+        if pixelSpace == False:
+            geom = pixelToLatLon(xCord[idx], yCord[idx], inputRaster)
+            ring.AddPoint(geom[0], geom[1], 0)
+        else:
+            ring.AddPoint(xCord[idx], yCord[idx], 0)
+
+    poly = ogr.Geometry(ogr.wkbPolygon)
+    if pixelSpace == False:
+        poly.AssignSpatialReference(targetSR)
+
+    poly.AddGeometry(ring)
+
+    return poly
+
+def createBoxFromLine(tmpGeom, ratio=1, halfWidth=-999, transformRequired=True, transform_WGS84_To_UTM='', transform_UTM_To_WGS84=''):
+    if transformRequired:
+        if transform_WGS84_To_UTM == '':
+            transform_WGS84_To_UTM, transform_UTM_To_WGS84 = createUTMTransform(tmpGeom)
+
+        tmpGeom.Transform(transform_WGS84_To_UTM)
+
+
+    # calculatuate Centroid
+    centroidX, centroidY, centroidZ = tmpGeom.Centroid().GetPoint()
+    lengthM = tmpGeom.Length()
+    if halfWidth ==-999:
+        halfWidth = lengthM/(2*ratio)
+
+    envelope=tmpGeom.GetPoints()
+    cX1 = envelope[0][0]
+    cY1 = envelope[0][1]
+    cX2 = envelope[1][0]
+    cY2 = envelope[1][1]
+    angRad = math.atan2(cY2-cY1,cX2-cX1)
+
+    d_X = math.cos(angRad-math.pi/2)*halfWidth
+    d_Y = math.sin(angRad-math.pi/2)*halfWidth
+
+    e_X = math.cos(angRad+math.pi/2)*halfWidth
+    e_Y = math.sin(angRad+math.pi/2)*halfWidth
+
+    ring = ogr.Geometry(ogr.wkbLinearRing)
+
+    ring.AddPoint(cX1+d_X, cY1+d_Y)
+    ring.AddPoint(cX1+e_X, cY1+e_Y)
+    ring.AddPoint(cX2+e_X, cY2+e_Y)
+    ring.AddPoint(cX2+d_X, cY2+d_Y)
+    ring.AddPoint(cX1+d_X, cY1+d_Y)
+    polyGeom = ogr.Geometry(ogr.wkbPolygon)
+    polyGeom.AddGeometry(ring)
+    areaM = polyGeom.GetArea()
+
+
+
+
+
+
+    if transformRequired:
+        tmpGeom.Transform(transform_UTM_To_WGS84)
+        polyGeom.Transform(transform_UTM_To_WGS84)
+
+
+    return (polyGeom, areaM, angRad, lengthM)
 
 
 def pixelToLatLon(xPix, yPix, inputRaster, targetSR=''):
@@ -511,7 +592,7 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
     #return poly to WGS84
     poly.Transform(transform_UTM_To_WGS84)
 
-    shapeSrc = ogr.Open(shapeFileSrc)
+    shapeSrc = ogr.Open(shapeFileSrc,0)
     if outlineSrc == '':
         geomOutline = poly
     else:
@@ -520,6 +601,8 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
         featureOutLine = layer.GetFeature(0)
         geomOutlineBase = featureOutLine.GetGeometryRef()
         geomOutline = geomOutlineBase.Intersection(poly)
+
+
 
     for llX in np.arange(minX, maxX, clipSizeMX*(1.0-clipOverlap)):
         for llY in np.arange(minY, maxY, clipSizeMY*(1.0-clipOverlap)):
@@ -550,8 +633,41 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
                     #print('outputFileName_{}'.format(outputFileName))
                     convert_wgs84geojson_to_pixgeojson(outGeoJson, outputFileName, pixelgeojson=outGeoJson.replace('.geojson', '_PIX.geojson'))
 
+def cutChipFromRasterCenter(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory='', outputPrefix='clip_',
+                      clipSizeMin=1, clipSizeSquare=True, bufferPerc=1.3, createPix=False):
+    srcImage = gdal.Open(rasterFile)
+    geoTrans, poly, ulX, ulY, lrX, lrY = getRasterExtent(srcImage)
+    rasterFileBase = os.path.basename(rasterFile)
+    if outputDirectory == "":
+        outputDirectory = os.path.dirname(rasterFile)
+    transform_WGS84_To_UTM, transform_UTM_To_WGS84, utm_cs = createUTMTransform(poly)
+    poly.Transform(transform_WGS84_To_UTM)
+    env = poly.GetEnvelope()
+    minX = env[0]
+    minY = env[2]
+    maxX = env[1]
+    maxY = env[3]
 
+    # return poly to WGS84
+    poly.Transform(transform_UTM_To_WGS84)
 
+    shapeSrc = ogr.Open(shapeFileSrc, 0)
+    if outlineSrc == '':
+        geomOutline = poly
+    else:
+        outline = ogr.Open(outlineSrc)
+        layer = outline.GetLayer()
+        featureOutLine = layer.GetFeature(0)
+        geomOutlineBase = featureOutLine.GetGeometryRef()
+        geomOutline = geomOutlineBase.Intersection(poly)
+
+    shapeSrcBase = ogr.Open(shapeFileSrc, 0)
+    layerBase = shapeSrcBase.GetLayer()
+    layerBase.SetSpatialFilter(geomOutline)
+
+    for feature in layerBase:
+        featureGeom = feature.GetGeometryRef()
+        geomEnv = featureGeom.GetEnvelope()
 
 
 
