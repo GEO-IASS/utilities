@@ -1,33 +1,60 @@
-from spaceNet import evalTools as eT
-from spaceNet import geoTools as gT
 from spaceNet import labelTools as lT
 from spaceNet import dataTools as dT
 import numpy as np
-import sys
-import multiprocessing
-import time
+import argparse
 import os
-import pickle
-from osgeo import ogr, gdal, osr
-
-import cv2
-from math import ceil
-import math
-
-
 
 if __name__ == "__main__":
 
-    rasterFileName = '/Users/dlindenbaum/dataStorage/dgData/panamaCanal/Validation/WV02_10032015/wv02_10032015_R2C2_mask.tif'
-    shapeFile = '/Users/dlindenbaum/dataStorage/dgData/panamaCanal/Validation/combinedTruthLine/TruthLine_BoatOnly_PanamaCanalValidate.shp'
-    outputDirectory = '/Users/dlindenbaum/dataStorage/dgData/test'
+    parser = argparse.ArgumentParser(description='Create Object Classification Dataset'
+                                                 'Supply Raster Image and GeoJson'
+                                                 'Program will cut a box with 30% buffer around the supplied features'
+                                                 'envelope.')
+    parser.add_argument("rasterSrc", help="raster to chip")
+    parser.add_argument("objectSrc", help="geoJSON of object Labels")
+    parser.add_argument("outputDirectory", help="Location To place chipped files")
+    parser.add_argument("--imgSize",
+                        help="set the pixel dimension of the square image.  "
+                             "Default is 256pixels"
+                             "Set to -1 for the images to not be resized",
+                        type=int)
 
-    newGeoJson = shapeFile.replace('.shp', "full.geojson")
-    lT.convertLabelStringToPoly(shapeFileSrc=shapeFile,outGeoJSon=shapeFile.replace('.shp', "full.geojson"), labelType='Boat')
+    parser.add_argument("--rotationStep",
+                        help="Augment dataset by rotating images about the unit circle at X degree increments"
+                             "rotationList = np.arange(0,360, rotationStep)"
+                             "Default is No Rotation",
+                        type=float)
+
+
+
+
+
+
+    args = parser.parse_args()
+
+    rasterFileName = args.rasterSrc
+
+    objectSrc = args.objectSrc
+    clipSize = args.clipSize
+    outputDirectory = args.outputDirectory
+    if args.imgSize:
+        finalImageSize = args.imgSize
+    else:
+        finalImageSize = 256
+
+    if args.rotationStep:
+        rotationList = np.arange(0, 360, args.rotationStep)
+    else:
+        rotationList = np.array([])
+
+
+
+
+
     dT.chipImage(rasterFileName,
-                 newGeoJson,
+                 objectSrc,
                  outputDirectory,
-                 finalImageSize=256,
+                 finalImageSize=finalImageSize,
                  rotationList=np.arange(0,360,5),
                  rotateNorth=True,
                  windowSize='adjust')

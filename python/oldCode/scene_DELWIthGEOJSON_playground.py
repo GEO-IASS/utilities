@@ -428,3 +428,15 @@ csvFileName = '../data/SolutionV8_noMulti.csv'
 geoJsonFileName = '../data/SolutionV8_noMulti.geojson'
 #writeToCSV_Polygon(sol_polysNoMultiV1, csvFileName, zeroImageIds=set(noBuildings['ImageId'].tolist()))
 writeToGeoJson(sol_polysNoMultiV1, geoJsonFileName, zeroImageIds=set(noBuildings['ImageId'].tolist()))
+
+
+##
+import cv2
+testImage = '/Users/dlindenbaum/dataStorage/dgData/test/noRotation/wv02_10032015_R2C2_mask10753_11109_ROT_270.7_label_1.png'
+angFromNor = 270
+img = cv2.imread(testImage)
+rows,cols,bands = img.shape
+M = cv2.getRotationMatrix2D((cols/2,rows/2),angFromNor,1)
+dst = cv2.warpAffine(img,M,(cols,rows))
+cv2.imshow('rotated90',dst)
+cv2.waitKey(0)
