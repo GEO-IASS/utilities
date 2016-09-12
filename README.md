@@ -9,6 +9,7 @@ All dependencies can be found in requirements.txt.  Main dependencies are GDAL P
 Basic Usage from the base directory.
 ```python
 python python/processBoatLabels.py rasterFile.tiff objectfile.geojson /tmp/storage/  
+```python
 
 ## License
 See [LICENSE](./LICENSE).
