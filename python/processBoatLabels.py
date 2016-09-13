@@ -35,7 +35,6 @@ if __name__ == "__main__":
     rasterFileName = args.rasterSrc
 
     objectSrc = args.objectSrc
-    clipSize = args.clipSize
     outputDirectory = args.outputDirectory
     if args.imgSize:
         finalImageSize = args.imgSize
