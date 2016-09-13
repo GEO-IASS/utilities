@@ -54,6 +54,6 @@ if __name__ == "__main__":
                  objectSrc,
                  outputDirectory,
                  finalImageSize=finalImageSize,
-                 rotationList=np.arange(0,360,5),
+                 rotationList=rotationList,
                  rotateNorth=True,
                  windowSize='adjust')
