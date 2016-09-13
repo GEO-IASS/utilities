@@ -1,11 +1,7 @@
 from osgeo import gdal, osr, ogr
 import numpy as np
 import os
-import csv
-import rtree
-import subprocess
 import geoTools as gT
-import evalTools as eT
 import math
 import cPickle as pickle
 
