@@ -35,7 +35,6 @@ if __name__ == "__main__":
     rasterFileName = args.rasterSrc
 
     objectSrc = args.objectSrc
-    clipSize = args.clipSize
     outputDirectory = args.outputDirectory
     if args.imgSize:
         finalImageSize = args.imgSize
@@ -55,6 +54,6 @@ if __name__ == "__main__":
                  objectSrc,
                  outputDirectory,
                  finalImageSize=finalImageSize,
-                 rotationList=np.arange(0,360,5),
+                 rotationList=rotationList,
                  rotateNorth=True,
                  windowSize='adjust')

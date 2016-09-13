@@ -2,9 +2,12 @@ from osgeo import gdal, osr, ogr
 import numpy as np
 import os
 import csv
-import rtree
 import subprocess
 import math
+try:
+    import rtree
+except:
+    print("rtree not installed, Will break evaluation code")
 
 
 def importgeojson(geojsonfilename):
