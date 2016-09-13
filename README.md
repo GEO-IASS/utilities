@@ -5,11 +5,11 @@ This repository has two python packages, geoTools and evalTools. The geoTools pa
 ## Dependencies
 All dependencies can be found in requirements.txt.  Some dependencies must be installed by apt-get.  Main dependencies are GDAL Python Bindings, OpenCV and numpy
 Installation instruction:
-'''
+```python
 sudo apt-get install python-gdal # Install Python Gdal Bindings
 sudo apt-get install python-opencv # Install OpenCV
 pip install -r requirements.txt # Install additional requirements
-
+```
 
 ## Example code
 Basic Usage from the base directory.
