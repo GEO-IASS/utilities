@@ -1,2 +1,10 @@
+shapely
+gdal
+matplotlib
+cv2
+tensorflow
+rtree
+matplotlib
+cv2
 #GDAL==1.11.3
 numpy==1.11.0
