@@ -1,12 +1,9 @@
-from osgeo import gdal, osr, ogr
+from osgeo import gdal, osr, ogr, gdalnumeric
 import numpy as np
 import os
 import geoTools as gT
 import math
 import cPickle as pickle
-
-
-
 
 
 def evaluateLineStringPlane(geom, label='Airplane'):
@@ -169,6 +166,100 @@ def createTruthPixelPolyPickle(truthPoly, pickleLocation=''):
         with open(pickleLocation, 'wb') as f:
             pickle.dump(envelopeData, f)
             # get Source Line File Information
+
+
+def createNPPixArray(rasterSrc, vectorSrc, npDistFileName='', units='pixels'):
+
+    ## open source vector file that truth data
+    source_ds = ogr.Open(vectorSrc)
+    source_layer = source_ds.GetLayer()
+
+    ## extract data from src Raster File to be emulated
+    ## open raster file that is to be emulated
+    srcRas_ds = gdal.Open(rasterSrc)
+    cols = srcRas_ds.RasterXSize
+    rows = srcRas_ds.RasterYSize
+    noDataValue = 0
+
+    if units=='meters':
+        geoTrans, poly, ulX, ulY, lrX, lrY = gT.getRasterExtent(srcRas_ds)
+        transform_WGS84_To_UTM, transform_UTM_To_WGS84, utm_cs = gT.createUTMTransform(poly)
+        line = ogr.Geometry(ogr.wkbLineString)
+        line.AddPoint(geoTrans[0], geoTrans[3])
+        line.AddPoint(geoTrans[0]+geoTrans[1], geoTrans[3])
+
+        line.Transform(transform_WGS84_To_UTM)
+        metersIndex = line.Length()
+    else:
+        metersIndex = 1
+
+    ## create First raster memory layer
+    memdrv = gdal.GetDriverByName('MEM')
+    dst_ds = memdrv.Create('', cols, rows, 1, gdal.GDT_Byte)
+    dst_ds.SetGeoTransform(srcRas_ds.GetGeoTransform())
+    dst_ds.SetProjection(srcRas_ds.GetProjection())
+    band = dst_ds.GetRasterBand(1)
+    band.SetNoDataValue(noDataValue)
+
+    gdal.RasterizeLayer(dst_ds, [1], source_layer, burn_values=[255])
+    srcBand = dst_ds.GetRasterBand(1)
+
+    memdrv2 = gdal.GetDriverByName('MEM')
+    prox_ds = memdrv2.Create('', cols, rows, 1, gdal.GDT_Int16)
+    prox_ds.SetGeoTransform(srcRas_ds.GetGeoTransform())
+    prox_ds.SetProjection(srcRas_ds.GetProjection())
+    proxBand = prox_ds.GetRasterBand(1)
+    proxBand.SetNoDataValue(noDataValue)
+
+    options = ['NODATA=0']
+
+    gdal.ComputeProximity(srcBand, proxBand, options)
+
+    memdrv3 = gdal.GetDriverByName('MEM')
+    proxIn_ds = memdrv3.Create('', cols, rows, 1, gdal.GDT_Int16)
+    proxIn_ds.SetGeoTransform(srcRas_ds.GetGeoTransform())
+    proxIn_ds.SetProjection(srcRas_ds.GetProjection())
+    proxInBand = proxIn_ds.GetRasterBand(1)
+    proxInBand.SetNoDataValue(noDataValue)
+    options = ['NODATA=0', 'VALUES=0']
+    gdal.ComputeProximity(srcBand, proxInBand, options)
+
+    proxIn = gdalnumeric.BandReadAsArray(proxInBand)
+    proxOut = gdalnumeric.BandReadAsArray(proxBand)
+
+    proxTotal = proxIn.astype(float) - proxOut.astype(float)
+    proxTotal = proxTotal*metersIndex
+
+    if npDistFileName != '':
+        np.save(npDistFileName, proxTotal)
+
+    return proxTotal
+
+
+def createGeoJSONFromRaster(geoJsonFileName, array2d, geom, proj,
+                            layerName="BuildingID",
+                            fieldName="BuildingID"):
+
+    memdrv = gdal.GetDriverByName('MEM')
+    src_ds = memdrv.Create('', array2d.shape[1], array2d.shape[0], 1)
+    src_ds.SetGeoTransform(geom)
+    src_ds.SetProjection(proj)
+    band = src_ds.GetRasterBand(1)
+    band.WriteArray(array2d)
+
+    dst_layername = "BuildingID"
+    drv = ogr.GetDriverByName("geojson")
+    dst_ds = drv.CreateDataSource(geoJsonFileName)
+    dst_layer = dst_ds.CreateLayer(layerName, srs=None)
+
+    fd = ogr.FieldDefn(fieldName, ogr.OFTInteger)
+    dst_layer.CreateField(fd)
+    dst_field = 1
+
+    gdal.Polygonize(band, None, dst_layer, dst_field, [], callback=None)
+
+    return
+
 
 
 

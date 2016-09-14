@@ -29,6 +29,25 @@ def importgeojson(geojsonfilename):
     return polys
 
 
+def mergePolyList(geojsonfilename):
+
+    multipolygon = ogr.Geometry(ogr.wkbMultiPolygon)
+    datasource = ogr.Open(geojsonfilename, 0)
+
+    layer = datasource.GetLayer()
+    print(layer.GetFeatureCount())
+
+
+    for idx, feature in enumerate(layer):
+
+        poly = feature.GetGeometryRef()
+
+        if poly:
+
+            multipolygon.AddGeometry(feature.GetGeometryRef().Clone())
+
+    return multipolygon
+
 def readwktcsv(csv_path):
     #
     # csv Format Expected = ['ImageId', 'BuildingId', 'PolygonWKT_Pix', 'PolygonWKT_Geo']
@@ -677,3 +696,5 @@ def cutChipFromRasterCenter(rasterFile, shapeFileSrc, outlineSrc='',outputDirect
 def createMaskedMosaic(input_raster, output_raster, outline_file):
 
     subprocess.call(["gdalwarp", "-q", "-cutline", outline_file, "-of", "GTiff", input_raster, output_raster])
+
+
