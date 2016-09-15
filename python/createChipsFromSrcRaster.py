@@ -70,6 +70,8 @@ if __name__ == '__main__':
 
     for rasterFile in rastList:
         rasterFinal = rasterFile
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
         if args.maskFile:
             rasterFinal = os.path.join(output_directory, os.path.basename(rasterFile).replace(".tif", "_mask.tif"))
             gT.createMaskedMosaic(rasterFile, rasterFinal, outlineSrc)

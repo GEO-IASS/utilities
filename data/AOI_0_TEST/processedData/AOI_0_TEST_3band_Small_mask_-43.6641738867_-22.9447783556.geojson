@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+                                                                                
+"features": [
+{ "type": "Feature", "properties": { "timestamp": "2016-06-22T21:41:49Z", "version": "1", "changeset": "5405", "user": "Derick", "uid": "43", "HGIS_OID": "1022872.0", "building": "yes", "type": "None", "id": "way\/87240", "area": "None", "QAStatus": "Original_Building", "HGISOID": 1022872.000000, "TaskArea": "West", "Revision1": "No", "Shape_Leng": 0.000507, "Shape_Area": 0.000000, "partialBuilding": 1.000000, "partialDec": 0.015191 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -43.664173886677901, -22.944402592792535, 0.0 ], [ -43.664162699999963, -22.9444058, 0.0 ], [ -43.664173886677901, -22.944444717034472, 0.0 ], [ -43.664173886677901, -22.944402592792535, 0.0 ] ] ] } },
+{ "type": "Feature", "properties": { "timestamp": "2016-06-22T22:29:26Z", "version": "1", "changeset": "5405", "user": "Derick", "uid": "43", "HGIS_OID": "1022869.0", "building": "yes", "type": "None", "id": "way\/125495", "area": "None", "QAStatus": "Modified_Original_Rev1", "HGISOID": 1022869.000000, "TaskArea": "West", "Revision1": "Yes", "Shape_Leng": 0.000302, "Shape_Area": 0.000000, "partialBuilding": 1.000000, "partialDec": 0.994591 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -43.664173886677901, -22.944650322982437, 0.0 ], [ -43.664165099999934, -22.944596199999978, 0.0 ], [ -43.664092508179998, -22.944607994972028, 0.0 ], [ -43.664092508179998, -22.944627645344134, 0.0 ], [ -43.6641013, -22.944681799999955, 0.0 ], [ -43.664173886677901, -22.944670005863408, 0.0 ], [ -43.664173886677901, -22.944650322982437, 0.0 ] ] ] } }
+]
+}

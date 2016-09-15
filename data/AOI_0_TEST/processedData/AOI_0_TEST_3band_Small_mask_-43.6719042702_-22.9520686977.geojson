@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+                                                                                
+"features": [
+{ "type": "Feature", "properties": { "timestamp": "2016-07-14T18:51:44Z", "version": "1", "changeset": "11470", "user": "rclark", "uid": "1094", "HGIS_OID": "None", "building": "yes", "type": "None", "id": "way\/446257", "area": "None", "QAStatus": "New_Building_Rev1", "HGISOID": 0.000000, "TaskArea": "West", "Revision1": "Yes", "Shape_Leng": 0.000313, "Shape_Area": 0.000000, "partialBuilding": 0.000000, "partialDec": 1.000000 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -43.670898199999954, -22.951783399999954, 0.0 ], [ -43.670843299999945, -22.951847099999952, 0.0 ], [ -43.670896199999959, -22.951880799999969, 0.0 ], [ -43.670963299999983, -22.951817099999971, 0.0 ], [ -43.670898199999954, -22.951783399999954, 0.0 ] ] ] } }
+]
+}

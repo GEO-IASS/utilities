@@ -577,7 +577,10 @@ def clipShapeFile(shapeSrc, outputFileName, polyToCut, minpartialPerc=0.0, debug
         geomNew = geom.Intersection(polyToCut)
         partialDec = -1
         if geomNew:
-            partialDec = geomNew.GetArea() / geom.GetArea()
+            if geom.GetArea() > 0:
+                partialDec = geomNew.GetArea() / geom.GetArea()
+            else:
+                partialDec = 0
             outFeature.SetField("partialDec", partialDec)
             if geom.GetArea() == geomNew.GetArea():
                 outFeature.SetField("partialBuilding", 0)
@@ -590,10 +593,7 @@ def clipShapeFile(shapeSrc, outputFileName, polyToCut, minpartialPerc=0.0, debug
         outFeature.SetGeometry(geomNew)
         if partialDec >= minpartialPerc:
             outLayer.CreateFeature(outFeature)
-            print ("AddFeature")
-        else:
-            print("PartialPercent={}".format(partialDec))
-
+            #print ("AddFeature")
 
 def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory='', outputPrefix='clip_',
                       clipSizeMX=100, clipSizeMY=100, clipOverlap=0.0, minpartialPerc=0.0, createPix=False):
@@ -695,6 +695,11 @@ def cutChipFromRasterCenter(rasterFile, shapeFileSrc, outlineSrc='',outputDirect
 
 def createMaskedMosaic(input_raster, output_raster, outline_file):
 
-    subprocess.call(["gdalwarp", "-q", "-cutline", outline_file, "-of", "GTiff", input_raster, output_raster])
+    subprocess.call(["gdalwarp", "-q", "-cutline", outline_file, "-of", "GTiff", input_raster, output_raster,
+                     '-wo', 'OPTIMIZE_SIZE=YES',
+                     '-co', 'COMPRESS=JPEG',
+                     '-co', 'PHOTOMETRIC=YCBCR',
+                     '-co', 'TILED=YES'])
+
 
 
