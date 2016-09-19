@@ -1,4 +1,5 @@
 from spaceNet import geoTools as gT
+from spaceNet import labelTools as lT
 import argparse
 import os
 
@@ -26,6 +27,10 @@ if __name__ == '__main__':
 
     parser.add_argument("-m", "--maskFile", help="mask input raster with outline src",
                         action="store_true")
+    parser.add_argument("-csum", "--createSummaryCSV", help="create Summary CSV file for Effort"
+                                                            "of submitted name ",
+                        type=str)
+
     args = parser.parse_args()
 
     rastList = []
@@ -66,8 +71,7 @@ if __name__ == '__main__':
         createPix=False
         print("createPixFalse")
 
-
-
+    chipSummaryListList = []
     for rasterFile in rastList:
         rasterFinal = rasterFile
         if not os.path.exists(output_directory):
@@ -75,12 +79,18 @@ if __name__ == '__main__':
         if args.maskFile:
             rasterFinal = os.path.join(output_directory, os.path.basename(rasterFile).replace(".tif", "_mask.tif"))
             gT.createMaskedMosaic(rasterFile, rasterFinal, outlineSrc)
-        gT.cutChipFromMosaic(rasterFinal, objectSrc, outlineSrc,
+        chipSummaryList= gT.cutChipFromMosaic(rasterFinal, objectSrc, outlineSrc,
                              outputDirectory=output_directory,
                              outputPrefix=output_prefix,
                              clipSizeMX=clipSize, clipSizeMY=clipSize,
                              clipOverlap=clipOverlap,
                              minpartialPerc=minpartialPerc,
                              createPix=createPix)
+
+        chipSummaryListList += chipSummaryList
+
+    if args.createSummaryCSV:
+        summaryFileName = os.path.join(output_directory, args.createSummaryCSV)
+        summaryFile = lT.createCSVSummaryFile(chipSummaryListList, summaryFileName, output_directory)
 
 

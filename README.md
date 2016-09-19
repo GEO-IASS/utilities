@@ -23,8 +23,10 @@ python python/createChipsFromSrcRaster.py data/AOI_0_TEST/srcData/3band/AOI_0_TE
                                           200 \
                                           data/AOI_0_TEST/processedData/ \
                                           --outlineSrc data/AOI_0_TEST/srcData/buildingLabels/AOI_0_TEST_Outline.geojson \
-                                          -m
-
+                                          -m \
+                                          -cpix \
+                                          -csum AOI_0_TEST_Summary.csv
+```
 
 ## License
 See [LICENSE](./LICENSE).

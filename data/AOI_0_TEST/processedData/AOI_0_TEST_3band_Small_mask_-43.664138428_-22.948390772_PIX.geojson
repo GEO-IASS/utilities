@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+                                                                                
+"features": [
+{ "type": "Feature", "properties": { "ImageId": "data\/AOI_0_TEST\/processedData\/AOI_0_TEST_3band_Small_mask_-43.664138428_-22.948390772", "BuildingId": 1 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 8.170456057939656, 361.255029045394792, 0.0 ], [ 10.243143804053199, 362.318207883359207, 0.0 ], [ 10.243143804053199, 359.350092521434476, 0.0 ], [ 8.170456057939656, 361.255029045394792, 0.0 ] ] ] } }
+]
+}

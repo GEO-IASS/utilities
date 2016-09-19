@@ -4,6 +4,7 @@ import os
 import geoTools as gT
 import math
 import cPickle as pickle
+import csv
 
 
 def evaluateLineStringPlane(geom, label='Airplane'):
@@ -259,6 +260,38 @@ def createGeoJSONFromRaster(geoJsonFileName, array2d, geom, proj,
     gdal.Polygonize(band, None, dst_layer, dst_field, [], callback=None)
 
     return
+
+
+def createCSVSummaryFile(chipSummaryList, outputFileName, outputdirectory=''):
+
+
+    with open(outputFileName, 'wb') as csvfile:
+        writerTotal = csv.writer(csvfile, delimiter=',', lineterminator='\n')
+
+        writerTotal.writerow(['ImageId', 'BuildingId', 'PolygonWKT_Pix', 'PolygonWKT_Geo'])
+
+        for chipSummary in chipSummaryList:
+            chipName = chipSummary['chipName']
+            geoVectorName = chipSummary['geoVectorName']
+            pixVectorName = chipSummary['pixVectorName']
+            buildingList = gT.convert_wgs84geojson_to_pixgeojson(geoVectorName,
+                                                                 os.path.join(outputdirectory,chipName))
+            if len(buildingList) > 0:
+                for building in buildingList:
+                    writerTotal.writerow([os.path.basename(building['ImageId']), building['BuildingId'],
+                                          building['polyPix'], building['polyGeo']])
+            else:
+                writerTotal.writerow([os.path.basename(chipName), -1,
+                                      'POLYGON((0 0, 0 0, 0 0, 0 0))', 'POLYGON ((0 0, 0 0, 0 0, 0 0))'])
+
+
+
+
+
+
+
+
+
 
 
 

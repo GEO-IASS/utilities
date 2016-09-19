@@ -10,7 +10,7 @@ except:
     print("rtree not installed, Will break evaluation code")
 
 
-def importgeojson(geojsonfilename):
+def import_summary_geojson(geojsonfilename):
     # driver = ogr.GetDriverByName('geojson')
     datasource = ogr.Open(geojsonfilename, 0)
 
@@ -24,6 +24,28 @@ def importgeojson(geojsonfilename):
 
         if poly:
             polys.append({'ImageId': feature.GetField('ImageId'), 'BuildingId': feature.GetField('BuildingId'),
+                          'poly': feature.GetGeometryRef().Clone()})
+
+    return polys
+
+
+def import_chip_geojson(geojsonfilename, ImageId=''):
+    # driver = ogr.GetDriverByName('geojson')
+    datasource = ogr.Open(geojsonfilename, 0)
+    if ImageId=='':
+        ImageId = geojsonfilename
+    layer = datasource.GetLayer()
+    print(layer.GetFeatureCount())
+
+    polys = []
+    BuildingId = 0
+    for idx, feature in enumerate(layer):
+
+        poly = feature.GetGeometryRef()
+
+        if poly:
+            BuildingId = BuildingId + 1
+            polys.append({'ImageId': ImageId, 'BuildingId': BuildingId,
                           'poly': feature.GetGeometryRef().Clone()})
 
     return polys
@@ -72,8 +94,10 @@ def readwktcsv(csv_path):
         building_reader = csv.reader(csvfile, delimiter=',', quotechar='"')
         next(building_reader, None)  # skip the headers
         for row in building_reader:
-            poly = ogr.CreateGeometryFromWkt(row[2])
-            buildinglist.append({'ImageId': row[0], 'BuildingId': int(row[1]), 'poly': poly})
+            polyPix = ogr.CreateGeometryFromWkt(row[2])
+            polyGeo = ogr.CreateGeometryFromWkt(row[3])
+            buildinglist.append({'ImageId': row[0], 'BuildingId': int(row[1]), 'polyPix': polyPix,
+                                 'polyGeo': polyGeo})
 
     return buildinglist
 
@@ -82,7 +106,8 @@ def exporttogeojson(geojsonfilename, buildinglist):
     #
     # geojsonname should end with .geojson
     # building list should be list of dictionaries
-    # list of Dictionaries {'ImageId': image_id, 'BuildingId': building_id, 'poly': poly}
+    # list of Dictionaries {'ImageId': image_id, 'BuildingId': building_id, 'polyPix': poly,
+    #                       'polyGeo': poly}
     # image_id is a string,
     # BuildingId is an integer,
     # poly is a ogr.Geometry Polygon
@@ -105,7 +130,7 @@ def exporttogeojson(geojsonfilename, buildinglist):
         feature = ogr.Feature(layer.GetLayerDefn())
         feature.SetField("ImageId", building['ImageId'])
         feature.SetField("BuildingId", building['BuildingId'])
-        feature.SetGeometry(building['poly'])
+        feature.SetGeometry(building['polyPix'])
 
         # Create the feature in the layer (geojson)
         layer.CreateFeature(feature)
@@ -403,7 +428,8 @@ def convert_wgs84geojson_to_pixgeojson(wgs84geojson, inputraster, image_id=[], p
                 building_id += 1
                 buildinglist.append({'ImageId': image_id,
                                      'BuildingId': building_id,
-                                     'poly': ogr.CreateGeometryFromWkt(geom_wkt[0])
+                                     'polyGeo': ogr.CreateGeometryFromWkt(geom.ExportToWkt()),
+                                     'polyPix': ogr.CreateGeometryFromWkt(geom_wkt[0])
                                      })
 
     if pixelgeojson:
@@ -624,7 +650,7 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
         geomOutlineBase = featureOutLine.GetGeometryRef()
         geomOutline = geomOutlineBase.Intersection(poly)
 
-
+    chipSummaryList = []
 
     for llX in np.arange(minX, maxX, clipSizeMX*(1.0-clipOverlap)):
         for llY in np.arange(minY, maxY, clipSizeMY*(1.0-clipOverlap)):
@@ -641,7 +667,8 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
                 maxXCut = envCut[1]
                 maxYCut = envCut[3]
                 polyCutWGS = createPolygonFromCorners(minXCut, minYCut, maxXCut, maxYCut)
-                outputFileName = os.path.join(outputDirectory, outputPrefix+rasterFileBase.replace('.tif', "_{}_{}.tif".format(minXCut,minYCut)))
+                chipName = outputPrefix + rasterFileBase.replace('.tif', "_{}_{}.tif".format(minXCut, minYCut))
+                outputFileName = os.path.join(outputDirectory, chipName)
                 ## Clip Image
                 subprocess.call(["gdalwarp", "-te", "{}".format(minXCut), "{}".format(minYCut),
                                  "{}".format(maxXCut),  "{}".format(maxYCut), rasterFile, outputFileName])
@@ -650,10 +677,22 @@ def cutChipFromMosaic(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory=''
                 polyVectorCut=polyCutWGS.Intersection(poly)
                 clipShapeFile(shapeSrc, outputFileName, polyVectorCut, minpartialPerc=minpartialPerc)
 
+                outPixGeoJson = []
                 if createPix:
-                    #print('outGeoJson_{}'.format(outGeoJson))
-                    #print('outputFileName_{}'.format(outputFileName))
-                    convert_wgs84geojson_to_pixgeojson(outGeoJson, outputFileName, pixelgeojson=outGeoJson.replace('.geojson', '_PIX.geojson'))
+                    outPixGeoJson = outGeoJson.replace('.geojson', '_PIX.geojson')
+                    buildinglist = convert_wgs84geojson_to_pixgeojson(outGeoJson, outputFileName, pixelgeojson=outPixGeoJson)
+
+                chipSummary = {'rasterSource'  : rasterFileBase,
+                               'chipName'      : chipName,
+                               'geoVectorName' : outGeoJson,
+                               'pixVectorName' : outPixGeoJson
+                               }
+
+                chipSummaryList.append(chipSummary)
+
+    return chipSummaryList
+
+
 
 def cutChipFromRasterCenter(rasterFile, shapeFileSrc, outlineSrc='',outputDirectory='', outputPrefix='clip_',
                       clipSizeMin=1, clipSizeSquare=True, bufferPerc=1.3, createPix=False):

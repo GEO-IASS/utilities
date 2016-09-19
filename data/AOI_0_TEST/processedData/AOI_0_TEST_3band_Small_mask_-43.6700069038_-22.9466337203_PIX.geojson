@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+                                                                                
+"features": [
+{ "type": "Feature", "properties": { "ImageId": "data\/AOI_0_TEST\/processedData\/AOI_0_TEST_3band_Small_mask_-43.6700069038_-22.9466337203", "BuildingId": 1 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 228.618618638648343, 406.000007132975838, 0.0 ], [ 228.672190175860379, 406.000007132975838, 0.0 ], [ 228.646008140865661, 405.973201710567935, 0.0 ], [ 228.618618638648343, 406.000007132975838, 0.0 ] ] ] } },
+{ "type": "Feature", "properties": { "ImageId": "data\/AOI_0_TEST\/processedData\/AOI_0_TEST_3band_Small_mask_-43.6700069038_-22.9466337203", "BuildingId": 2 }, "geometry": { "type": "Polygon", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "ImageId": "data\/AOI_0_TEST\/processedData\/AOI_0_TEST_3band_Small_mask_-43.6700069038_-22.9466337203", "BuildingId": 3 }, "geometry": { "type": "Polygon", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "ImageId": "data\/AOI_0_TEST\/processedData\/AOI_0_TEST_3band_Small_mask_-43.6700069038_-22.9466337203", "BuildingId": 4 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 205.098204982292316, 314.618491975399991, 0.0 ], [ 219.142310650588797, 314.150691702149572, 0.0 ], [ 217.584327448124583, 300.250340851061139, 0.0 ], [ 203.540221790898215, 301.208217585297234, 0.0 ], [ 205.098204982292316, 314.618491975399991, 0.0 ] ] ] } }
+]
+}
