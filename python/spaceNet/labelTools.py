@@ -5,6 +5,7 @@ import geoTools as gT
 import math
 import cPickle as pickle
 import csv
+import glob
 
 
 def evaluateLineStringPlane(geom, label='Airplane'):
@@ -285,6 +286,34 @@ def createCSVSummaryFile(chipSummaryList, outputFileName, outputdirectory=''):
                                       'POLYGON((0 0, 0 0, 0 0, 0 0))', 'POLYGON ((0 0, 0 0, 0 0, 0 0))'])
 
 
+
+def createCSVSummaryFileFromJsonList(geoJsonList, outputFileName, chipnameList=[],
+                                     input='Geo'):
+
+    if chipnameList:
+        pass
+    else:
+        for geoJson in geoJsonList:
+            chipnameList.append(os.path.basename(os.path.splitext(geoJson)[0]))
+
+
+
+    with open(outputFileName, 'wb') as csvfile:
+        writerTotal = csv.writer(csvfile, delimiter=',', lineterminator='\n')
+
+        writerTotal.writerow(['ImageId', 'BuildingId', 'PolygonWKT_Pix', 'PolygonWKT_Geo'])
+
+        for geoVectorName, chipName in zip(geoJsonList, chipnameList):
+
+            buildingList = gT.convert_wgs84geojson_to_pixgeojson(geoVectorName, '',
+                                                                 image_id=chipName)
+            if len(buildingList) > 0:
+                for building in buildingList:
+                    writerTotal.writerow([os.path.basename(building['ImageId']), building['BuildingId'],
+                                          building['polyPix'], building['polyGeo']])
+            else:
+                writerTotal.writerow([os.path.basename(chipName), -1,
+                                  'POLYGON((0 0, 0 0, 0 0, 0 0))', 'POLYGON ((0 0, 0 0, 0 0, 0 0))'])
 
 
 

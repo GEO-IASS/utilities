@@ -401,7 +401,7 @@ def geoWKTToPixelWKT(geom, inputRaster, targetSR, geomTransform):
 def convert_wgs84geojson_to_pixgeojson(wgs84geojson, inputraster, image_id=[], pixelgeojson=[], only_polygons=True):
     dataSource = ogr.Open(wgs84geojson, 0)
     layer = dataSource.GetLayer()
-    print(layer.GetFeatureCount())
+    #print(layer.GetFeatureCount())
     building_id = 0
     # check if geoJsonisEmpty
     buildinglist = []
@@ -409,27 +409,39 @@ def convert_wgs84geojson_to_pixgeojson(wgs84geojson, inputraster, image_id=[], p
         image_id = inputraster.replace(".tif", "")
 
     if layer.GetFeatureCount() > 0:
-        srcRaster = gdal.Open(inputraster)
-        targetSR = osr.SpatialReference()
-        targetSR.ImportFromWkt(srcRaster.GetProjectionRef())
-        geomTransform = srcRaster.GetGeoTransform()
+
+        if len(inputraster)>0:
+            srcRaster = gdal.Open(inputraster)
+            targetSR = osr.SpatialReference()
+            targetSR.ImportFromWkt(srcRaster.GetProjectionRef())
+            geomTransform = srcRaster.GetGeoTransform()
+
+
+
 
         for feature in layer:
 
             geom = feature.GetGeometryRef()
+            if len(inputraster)>0:
+                ## Calculate 3 band
+                if only_polygons:
+                    geom_wkt_list = geoPolygonToPixelPolygonWKT(geom, inputraster, targetSR, geomTransform)
+                else:
+                    geom_wkt_list = geoWKTToPixelWKT(geom, inputraster, targetSR, geomTransform)
 
-            ## Calculate 3 band
-            if only_polygons:
-                geom_wkt_list = geoPolygonToPixelPolygonWKT(geom, inputraster, targetSR, geomTransform)
+                for geom_wkt in geom_wkt_list:
+                    building_id += 1
+                    buildinglist.append({'ImageId': image_id,
+                                         'BuildingId': building_id,
+                                         'polyGeo': ogr.CreateGeometryFromWkt(geom.ExportToWkt()),
+                                         'polyPix': ogr.CreateGeometryFromWkt(geom_wkt[0])
+                                         })
             else:
-                geom_wkt_list = geoWKTToPixelWKT(geom, inputraster, targetSR, geomTransform)
-
-            for geom_wkt in geom_wkt_list:
                 building_id += 1
                 buildinglist.append({'ImageId': image_id,
                                      'BuildingId': building_id,
                                      'polyGeo': ogr.CreateGeometryFromWkt(geom.ExportToWkt()),
-                                     'polyPix': ogr.CreateGeometryFromWkt(geom_wkt[0])
+                                     'polyPix': ogr.CreateGeometryFromWkt('POLYGON((0 0, 0 0, 0 0, 0 0))')
                                      })
 
     if pixelgeojson:
